@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { createInlineKeyboard } = require('your-bot-library'); // Replace with actual keyboard utility
+const { createInlineKeyboard } = require('telebot');
 const FormData = require('form-data');
 const { Readable } = require('stream');
 
