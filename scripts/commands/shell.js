@@ -19,7 +19,7 @@ module.exports = {
     initialDir: path.resolve(process.cwd()), // Set initial directory to the main project directory
 
     onStart: async function({ bot, args, chatId, userId, msg }) {
-        const owner = '5947023314'; // Replace with your Telegram user ID
+        const owner = '6388959089'; // Replace with your Telegram user ID
         if (userId.toString() !== owner) {
             return bot.sendMessage(chatId, 'You do not have permission to use this command.', { replyToMessage: msg.message_id });
         }
