@@ -2,7 +2,7 @@
   "botToken": "7500084843:AAEG88RzpttqvpFb0bBP8XBG7I72Z4PI-HE",
   "mongoURI": "mongodb+srv://priyanshikaurji:priyanshikaurji@cluster0.kcbnt.mongodb.net/TeleBot?retryWrites=true&w=majority&appName=Cluster0",
   "note": "Make sure to add your bot token and mongoURI from MongoDB and also respect author for their hardwork for this project by not changing code unnecessarily.",
-  "prefix": "/",
+  "prefix": ".",
   "adminId": [
     "6388959089"
   ],
