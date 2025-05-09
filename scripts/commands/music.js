@@ -1,122 +1,162 @@
-const axios = require('axios');
-const { createInlineKeyboard } = require('telebot');
-const FormData = require('form-data');
-const { Readable } = require('stream');
-
-// Temporary storage for user selections
-const tempStorage = new Map();
+const youtubesearchapi = require("youtube-search-api");
+const { ytmp3 } = require('@vreden/youtube_scraper');
+const config = require('../../config.json');
 
 module.exports = {
-    config: {
-        name: "music",
-        aliases: ["song", "play"],
-        category: "music",
-        role: 0,
-        cooldowns: 5,
-        version: '1.0.0',
-        author: 'Priyanshi Kaur',
-        description: "Search and download music from YouTube",
-        usage: "music <song name>"
-    },
-
-    onStart: async function ({ bot, msg, args }) {
-        const chatId = msg.chat.id;
-        
-        if (!args.length) {
-            return bot.sendMessage(chatId, "Please provide a song name.\nExample: /music Paro Paro", {
-                replyToMessage: msg.message_id
-            });
-        }
-
+    name: 'music',
+    description: 'Search and download music from YouTube',
+    permission: 0,
+    cooldowns: 10,
+    dmUser: true,
+    author: config.botSettings.ownerName || 'Priyanshi kaur',
+    run: async ({ sock, m, args }) => {
         try {
             const query = args.join(' ');
-            const searchUrl = `https://dev-priyanshi.onrender.com/api/ytsearch?query=${encodeURIComponent(query)}`;
-
-            const response = await axios.get(searchUrl);
-            const results = response.data.results;
-
-            if (!results || !results.length) {
-                return bot.sendMessage(chatId, "No results found for your query.", {
-                    replyToMessage: msg.message_id
-                });
+            
+            if (!query) {
+                return await sock.sendMessage(
+                    m.key.remoteJid, 
+                    { text: `Please provide a search query.\nExample: ${global.prefix}music never gonna give you up` },
+                    { quoted: m }
+                );
             }
 
-            // Send first 3 results
-            for (const [index, result] of results.slice(0, 3).entries()) {
-                const keyboard = createInlineKeyboard([
-                    [{ text: "Download", callback_data: `music_select ${result.url}` }]
-                ]);
+            // Show searching indicator
+            await sock.sendMessage(
+                m.key.remoteJid,
+                { text: `🔍 Searching for "${query}"...` },
+                { quoted: m }
+            );
 
-                await bot.sendPhoto(chatId, result.thumbnail, {
-                    caption: `🎵 *${result.title}*\n🎤 ${result.author}\n⏱ ${result.duration}`,
-                    parse_mode: 'Markdown',
-                    reply_markup: keyboard
-                });
+            // Search YouTube
+            const searchResults = await youtubesearchapi.GetListByKeyword(query, false, 5);
+
+            if (!searchResults.items || searchResults.items.length === 0) {
+                return await sock.sendMessage(
+                    m.key.remoteJid,
+                    { text: `❌ No results found for "${query}"` },
+                    { quoted: m }
+                );
             }
 
-        } catch (error) {
-            console.error('Search error:', error);
-            bot.sendMessage(chatId, "An error occurred while searching. Please try again later.", {
-                replyToMessage: msg.message_id
+            // Format results
+            const results = searchResults.items.map((video, index) => ({
+                index: index + 1,
+                title: video.title,
+                id: video.id,
+                url: `https://www.youtube.com/watch?v=${video.id}`,
+                duration: video.length?.simpleText || "N/A",
+                views: video.viewCount || "N/A",
+                author: video.channelTitle,
+                thumbnail: video.thumbnail?.thumbnails?.pop()?.url || null
+            }));
+
+            // Send search results
+            let resultText = `🎵 Search Results for "${query}":\n\n`;
+            results.forEach(item => {
+                resultText += `${item.index}. *${item.title}*\n`;
+                resultText += `👤 ${item.author} | ⏱️ ${item.duration} | 👀 ${item.views}\n`;
+                resultText += `🔗 ${item.url}\n\n`;
             });
-        }
-    },
+            resultText += `\nReply with the number (1-${results.length}) to download the audio.`;
 
-    onCallback: async function ({ bot, msg, data }) {
-        const chatId = msg.chat.id;
-        const [action, ...params] = data.split(' ');
+            await sock.sendMessage(
+                m.key.remoteJid,
+                { text: resultText },
+                { quoted: m }
+            );
 
-        try {
-            switch (action) {
-                case 'music_select': {
-                    const url = params[0];
-                    tempStorage.set(chatId, { url });
-                    
-                    const keyboard = createInlineKeyboard([
-                        [
-                            { text: "92kbps", callback_data: `music_quality 92 ${url}` },
-                            { text: "128kbps", callback_data: `music_quality 128 ${url}` }
-                        ],
-                        [
-                            { text: "256kbps", callback_data: `music_quality 256 ${url}` },
-                            { text: "320kbps", callback_data: `music_quality 320 ${url}` }
-                        ]
-                    ]);
+            // Wait for user selection
+            const reply = await waitForReply(sock, m.key.remoteJid, m.sender, results.length);
+            
+            if (!reply || isNaN(reply) || reply < 1 || reply > results.length) {
+                return await sock.sendMessage(
+                    m.key.remoteJid,
+                    { text: '❌ Invalid selection or timeout. Please try again.' },
+                    { quoted: m }
+                );
+            }
 
-                    await bot.sendMessage(chatId, "Select audio quality:", {
-                        reply_markup: keyboard
-                    });
-                    break;
-                }
+            const selected = results[reply - 1];
+            
+            // Download processing message
+            await sock.sendMessage(
+                m.key.remoteJid,
+                { text: `⬇️ Downloading: ${selected.title}\nThis may take a moment...` },
+                { quoted: m }
+            );
 
-                case 'music_quality': {
-                    const quality = params[0];
-                    const url = params[1];
-                    
-                    const downloadUrl = `https://dev-priyanshi.onrender.com/api/ytmp3dl?url=${encodeURIComponent(url)}&quality=${quality}`;
-                    const response = await axios.get(downloadUrl);
-                    
-                    if (!response.data.download.url) {
-                        throw new Error('Invalid download URL');
+            // Download audio
+            const downloadResult = await ytmp3(selected.url, "128").catch(err => {
+                console.error('Download error:', err);
+                return { status: false, result: 'Failed to download audio' };
+            });
+
+            if (!downloadResult.status) {
+                return await sock.sendMessage(
+                    m.key.remoteJid,
+                    { text: `❌ Error downloading audio: ${downloadResult.result}` },
+                    { quoted: m }
+                );
+            }
+
+            // Send audio file
+            await sock.sendMessage(
+                m.key.remoteJid,
+                { 
+                    audio: { url: downloadResult.download },
+                    mimetype: 'audio/mpeg',
+                    fileName: `${selected.title}.mp3`,
+                    contextInfo: {
+                        externalAdReply: {
+                            title: selected.title,
+                            body: `🎵 ${global.botName} Music`,
+                            thumbnailUrl: selected.thumbnail,
+                            mediaType: 2,
+                            mediaUrl: selected.url,
+                            sourceUrl: selected.url
+                        }
                     }
+                },
+                { quoted: m }
+            );
 
-                    // Send as audio file
-                    const audioResponse = await axios.get(response.data.download.url, {
-                        responseType: 'stream'
-                    });
-
-                    await bot.sendAudio(chatId, Readable.from(audioResponse.data), {
-                        title: response.data.metadata.title,
-                        performer: response.data.metadata.author.name
-                    });
-                    break;
-                }
-            }
         } catch (error) {
-            console.error('Download error:', error);
-            bot.sendMessage(chatId, "Failed to download the audio. Please try again.", {
-                replyToMessage: msg.message_id
-            });
+            console.error('Music command error:', error);
+            await sock.sendMessage(
+                m.key.remoteJid,
+                { text: `❌ An error occurred: ${error.message}` },
+                { quoted: m }
+            );
         }
     }
 };
+
+// Helper function to wait for user reply
+async function waitForReply(sock, chatId, userId, maxNumber) {
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(null), 30000); // 30 seconds timeout
+        
+        const listener = async (message) => {
+            try {
+                if (!message.key.fromMe && message.key.remoteJid === chatId && 
+                    message.sender === userId && message.message?.conversation) {
+                    
+                    const num = parseInt(message.message.conversation.trim());
+                    if (!isNaN(num) && num >= 1 && num <= maxNumber) {
+                        clearTimeout(timeout);
+                        sock.ev.off('messages.upsert', listener);
+                        resolve(num);
+                    }
+                }
+            } catch (err) {
+                console.error('Reply listener error:', err);
+                clearTimeout(timeout);
+                sock.ev.off('messages.upsert', listener);
+                resolve(null);
+            }
+        };
+
+        sock.ev.on('messages.upsert', listener);
+    });
+}
