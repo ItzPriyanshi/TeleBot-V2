@@ -43,6 +43,7 @@
     "speedtest-net": "^2.2.0",
     "telebot": "^1.4.1",
     "tesseract.js": "^5.1.0",
+    "os": "^0.1.2",
     "yt-search": "^2.11.0",
     "ytdl-core": "^4.11.5"
   }
