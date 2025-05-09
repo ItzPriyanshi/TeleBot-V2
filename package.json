@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "@zxing/library": "^0.21.3",
+    "@vreden/youtube_scraper": "^1.2.7",
     "aptoide-scraper": "^1.0.1",
     "archiver": "^7.0.1",
     "axios": "^1.7.7",
