@@ -38,6 +38,7 @@
     "qrcode": "^1.5.4",
     "qrcode-reader": "^1.0.4",
     "sharp": "^0.33.5",
+    "stream": "^0.0.3",
     "simple-git": "^3.26.0",
     "speedtest-net": "^2.2.0",
     "telebot": "^1.4.1",
