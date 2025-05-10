@@ -9,7 +9,7 @@ module.exports = {
         role: 0,
         cooldowns: 5,
         version: '1.0.0',
-        author: 'Samir Thakuri',
+        author: 'Samir Thakuri || Priyanshi Kaur',
         description: 'Get a list of all available commands or detailed information about a specific command',
         usage: 'help [command|page]'
     },
@@ -126,7 +126,7 @@ ${config.prefix}${usage}
                 const commandList = commands.slice(0, 15); // Show first 15 commands
                 let helpMessage = `Hello, ${msg.from.first_name}!\nHere's My Command List\n\n━━━━━━━━━━━━━━━━━━━━━━`;
                 commandList.forEach((cmd, index) => {
-                    helpMessage += `\n[${index + 1}]. ${cmd.config.name} - ${cmd.config.description|| ''}\n`;
+                    helpMessage += `\n[${index + 1}]. ${cmd.config.name} - ${cmd.config.description || ''}\n`;
                 });
                 helpMessage += `\n━━━━━━━━━━━━━━━━━━━━━━\nPage [ 1/${Math.ceil(commands.length / 15)} ]\n`;
                 helpMessage += `Currently, the bot has ${commands.length} commands that can be used\n`;
