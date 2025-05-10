@@ -1,5 +1,6 @@
-const { search, ytmp3, ytmp4, ytdlv2, channel } = require('@vreden/youtube_scraper');
-const { inlineButton, inlineKeyboard, sendAudio } = require('telebot');
+const { ytmp3 } = require('@vreden/youtube_scraper');
+const { inlineButton, inlineKeyboard } = require('telebot');
+const { YouTubeSearchApi } = require('youtube-search-api');
 
 module.exports = {
     config: {
@@ -9,12 +10,12 @@ module.exports = {
         role: 0,
         cooldowns: 5,
         version: '1.0.0',
-        author: 'Priyanshi Kaur',
+        author: 'Samir Thakuri',
         description: 'Search for songs and download them',
         usage: 'music <song name>'
     },
 
-    onStart: async function({ msg, bot, args, config }) {
+    onStart: async function({ msg, bot, args }) {
         if (!args.length) {
             return bot.sendMessage(msg.chat.id, 'Please provide the song name.', { replyToMessage: msg.message_id });
         }
@@ -23,38 +24,28 @@ module.exports = {
         const chatId = msg.chat.id;
 
         try {
-            const searchResult = await search(query);
+            const result = await YouTubeSearchApi.GetListByKeyword(query, false, 1);
+            const item = result.items.find(i => i.type === 'video');
+            if (!item) return bot.sendMessage(chatId, 'No results found.', { replyToMessage: msg.message_id });
 
-            if (!searchResult || !searchResult.length) {
-                return bot.sendMessage(chatId, 'No results found for that query.', { replyToMessage: msg.message_id });
-            }
+            const videoId = item.id;
+            const title = item.title;
+            const duration = item.length.simpleText || 'Unknown';
+            const thumbnail = item.thumbnail.thumbnails.pop().url;
 
-            const song = searchResult[0];
-            const videoId = song.id;
-            const title = song.title;
-            const thumbnail = song.thumbnail;
-            const duration = song.duration;
-            const description = song.description || 'No description available';
-
-            let message = `Found song:\n\n`;
-            message += `Title: ${title}\n`;
-            message += `Duration: ${duration}\n`;
-            message += `Description: ${description}\n`;
-
-            const buttons = [
-                [inlineButton('128 kbps', { callback_data: `quality_128_${videoId}` })],
-                [inlineButton('192 kbps', { callback_data: `quality_192_${videoId}` })],
-                [inlineButton('256 kbps', { callback_data: `quality_256_${videoId}` })],
-                [inlineButton('320 kbps', { callback_data: `quality_320_${videoId}` })]
-            ];
+            let message = `🎵 *Found song:*\n\n*Title:* ${title}\n*Duration:* ${duration}`;
+            const buttons = [64, 96, 128, 192, 256, 320].map(kbps => [
+                inlineButton(`${kbps} kbps`, { callback_data: `music_dl_${kbps}_${videoId}` })
+            ]);
 
             return bot.sendPhoto(chatId, thumbnail, {
                 caption: message,
+                parseMode: 'Markdown',
                 replyMarkup: inlineKeyboard(buttons)
             });
         } catch (error) {
             console.error(error);
-            return bot.sendMessage(chatId, 'An error occurred while searching for the song.', { replyToMessage: msg.message_id });
+            return bot.sendMessage(chatId, 'Failed to search for music.', { replyToMessage: msg.message_id });
         }
     }
 };
