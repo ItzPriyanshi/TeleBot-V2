@@ -1,68 +1,103 @@
-const { ytmp3 } = require('@vreden/youtube_scraper');
-const { inlineButton, inlineKeyboard } = require('telebot');
+const { search, ytmp3 } = require('@vreden/youtube_scraper');
 const axios = require('axios');
 
 module.exports = {
-    config: {
-        name: 'music',
-        aliases: ['song', 'track'],
-        category: 'utility',
-        role: 0,
-        cooldowns: 5,
-        version: '1.0.0',
-        author: 'Priyanshi Kaur',
-        description: 'Search for songs and download them',
-        usage: 'music <song name>'
-    },
+  config: {
+    name: "music",
+    aliases: ["song", "audio"],
+    role: 0,
+    cooldowns: 10,
+    version: '1.0.0',
+    author: 'Priyanshi Kaur',
+    category: "media",
+    description: "Search and download music from YouTube",
+    usage: "music <song name>"
+  },
 
-    onStart: async function({ msg, bot, args }) {
-        if (!args.length) {
-            return bot.sendMessage(msg.chat.id, 'Please provide the song name.', { replyToMessage: msg.message_id });
-        }
-
-        const query = args.join(' ');
-        const chatId = msg.chat.id;
-
-        const url = `https://me0xn4hy3i.execute-api.us-east-1.amazonaws.com/staging/api/resolve/resolveYoutubeSearch?search=${encodeURIComponent(query)}`;
-        const headers = {
-            accept: "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "sec-ch-ua": '"Not A(Brand";v="8", "Chromium";v="132"',
-            "sec-ch-ua-mobile": "?1",
-            "sec-ch-ua-platform": '"Android"',
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "cross-site",
-            Referer: "https://v4.mp3paw.link/",
-            "Referrer-Policy": "strict-origin-when-cross-origin"
-        };
-
-        try {
-            const res = await axios.get(url, { headers });
-            const videos = res.data?.videos;
-            if (!videos || !videos.length) {
-                return bot.sendMessage(chatId, 'No results found for that query.', { replyToMessage: msg.message_id });
-            }
-
-            const song = videos[0]; // Use the first result
-            const videoId = song.videoId;
-            const title = song.title;
-            const duration = song.lengthText || 'Unknown';
-            const thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-
-            let message = `🎵 *Found song:*\n\n*Title:* ${title}\n*Duration:* ${duration}`;
-            const buttons = [64, 96, 128, 192, 256, 320].map(kbps => [
-                inlineButton(`${kbps} kbps`, { callback_data: `music_dl_${kbps}_${videoId}` })
-            ]);
-
-            return bot.sendPhoto(chatId, thumbnail, {
-                caption: message,
-                parseMode: 'Markdown',
-                replyMarkup: inlineKeyboard(buttons)
-            });
-        } catch (error) {
-            console.error('Search error:', error);
-            return bot.sendMessage(chatId, 'An error occurred while searching for the song.', { replyToMessage: msg.message_id });
-        }
+  onStart: async function ({ bot, msg, args }) {
+    if (!args[0]) {
+      return bot.sendMessage(msg.chat.id, `Please provide a song name.\nUsage: ${this.config.usage}`, { replyToMessage: msg.message_id });
     }
+
+    const query = args.join(" ");
+    const loadingMsg = await bot.sendMessage(msg.chat.id, "🔍 Searching for music...", { replyToMessage: msg.message_id });
+
+    try {
+      let searchResult;
+      try {
+        const searchResponse = await axios.get(`https://dev-priyanshi.onrender.com/api/ytsearch?query=${encodeURIComponent(query)}`);
+        if (searchResponse.data.status && searchResponse.data.results.length > 0) {
+          searchResult = searchResponse.data.results[0];
+        } else {
+          throw new Error("No results found");
+        }
+      } catch (e) {
+        const localSearch = await search(query);
+        if (localSearch.status && localSearch.results.length > 0) {
+          searchResult = localSearch.results[0];
+        } else {
+          throw new Error("No results found");
+        }
+      }
+
+      const qualityButtons = [
+        [
+          bot.inlineButton("64kbps", { callback: `music_64_${encodeURIComponent(searchResult.url)}` }),
+          bot.inlineButton("128kbps", { callback: `music_128_${encodeURIComponent(searchResult.url)}` }),
+          bot.inlineButton("192kbps", { callback: `music_192_${encodeURIComponent(searchResult.url)}` })
+        ],
+        [
+          bot.inlineButton("256kbps", { callback: `music_256_${encodeURIComponent(searchResult.url)}` }),
+          bot.inlineButton("320kbps", { callback: `music_320_${encodeURIComponent(searchResult.url)}` })
+        ]
+      ];
+
+      const caption = `🎵 ${searchResult.title}\n🎤 ${searchResult.author || "Unknown artist"}\n⏱ ${searchResult.duration || "Unknown duration"}\n\nPlease select audio quality:`;
+      
+      await bot.editMessageText(
+        { chatId: loadingMsg.chat.id, messageId: loadingMsg.message_id },
+        caption,
+        { replyMarkup: bot.inlineKeyboard(qualityButtons) }
+      );
+
+    } catch (error) {
+      console.error("Music search error:", error);
+      await bot.editMessageText(
+        { chatId: loadingMsg.chat.id, messageId: loadingMsg.message_id },
+        "Failed to find music. Please try again with a different query.",
+        { replyToMessage: msg.message_id }
+      );
+    }
+  },
+
+  onCallback: async function ({ bot, msg, data }) {
+    const [quality, url] = data.split("_");
+    const decodedUrl = decodeURIComponent(url);
+    const processingMsg = await bot.sendMessage(msg.chat.id, `⬇️ Downloading ${quality}kbps audio...`, { replyToMessage: msg.message_id });
+
+    try {
+      const audioResult = await ytmp3(decodedUrl, quality);
+      if (audioResult.status) {
+        await bot.sendAudio(
+          msg.chat.id,
+          audioResult.download,
+          {
+            title: audioResult.metadata?.title || "Music",
+            performer: audioResult.metadata?.author || "Unknown",
+            replyToMessage: msg.message_id
+          }
+        );
+        await bot.deleteMessage(processingMsg.chat.id, processingMsg.message_id);
+      } else {
+        throw new Error(audioResult.result);
+      }
+    } catch (error) {
+      console.error("Music download error:", error);
+      await bot.editMessageText(
+        { chatId: processingMsg.chat.id, messageId: processingMsg.message_id },
+        "Failed to download audio. Please try again later.",
+        { replyToMessage: msg.message_id }
+      );
+    }
+  }
 };
