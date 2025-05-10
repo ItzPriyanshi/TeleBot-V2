@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const moment = require('moment-timezone');
 const axios = require('axios');
+const { search, ytmp3 } = require('@vreden/youtube_scraper');  // Import YouTube scraper
 
 const bot = new TeleBot(config.botToken);
 
@@ -33,7 +34,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
         });
     };
     loadCommands(path.join(__dirname, 'scripts/commands'));
-    
+
     // Function to load and execute events
     const loadEvents = async (bot, threadModel, userModel) => {
         const eventsDir = path.join(__dirname, 'scripts', 'events');
@@ -69,7 +70,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
             return null;
         }
     };
-    
+
     const cooldowns = new Map();
 
     // Check if user has necessary permissions to execute a command
@@ -91,7 +92,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
     bot.on('text', async (msg) => {
         const chatId = msg.chat.id.toString();
         const userId = msg.from.id.toString();
-        
+
         // Find or create thread in database
         let thread = await threadModel.findOne({ chatId });
         if (!thread) {
@@ -99,7 +100,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
             await thread.save();
             console.log(`[DATABASE] New thread: ${chatId} database has been created!`);
         }
-        
+
         // Find or create user in database
         let user = await userModel.findOne({ userID: userId });
         if (!user) {
@@ -147,7 +148,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
             if (!thread.users) {
                 thread.users = new Map();
             }
-        
+
             if (!thread.users.has(userId)) {
                 thread.users.set(userId, { totalMsg: 1 });
             } else {
@@ -155,7 +156,7 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
             }
             await thread.save();
         }
-        
+
         // Handle command processing (if message starts with the configured prefix)
         if (msg.text.startsWith(config.prefix)) {
             const args = msg.text.slice(config.prefix.length).trim().split(/ +/);
@@ -165,35 +166,35 @@ connectDB(config.mongoURI).then(async ({ threadModel, userModel }) => {
             if (!command) {
                 return bot.sendMessage(chatId, 'Invalid command.', { replyToMessage: msg.message_id });
             }
-        
+
             const { role, cooldown } = command.config;
 
             // Role validation
             if (!(await hasPermission(userId, chatId, command.config))) {
                 return bot.sendMessage(chatId, 'You do not have permission to use this command.', { replyToMessage: msg.message_id });
             }
-        
+
             // Cooldown check
             if (!cooldowns.has(commandName)) {
                 cooldowns.set(commandName, new Map());
             }
-        
+
             const now = Date.now();
             const timestamps = cooldowns.get(commandName);
             const cooldownAmount = (cooldown || 3) * 1000; // Default cooldown of 3 seconds
-        
+
             if (timestamps.has(userId)) {
                 const expirationTime = timestamps.get(userId) + cooldownAmount;
-        
+
                 if (now < expirationTime) {
                     const timeLeft = (expirationTime - now) / 1000;
                     return bot.sendMessage(chatId, `Please wait ${timeLeft.toFixed(1)} more seconds before reusing the ${commandName} command.`, { replyToMessage: msg.message_id });
                 }
             }
-        
+
             timestamps.set(userId, now);
             setTimeout(() => timestamps.delete(userId), cooldownAmount);
-        
+
             // Execute command
             try {
                 await command.onStart({ msg, bot, args, chatId, userId, config, botName: config.botName, senderName: `${msg.from.first_name} ${msg.from.last_name}`, username: msg.from.username, copyrightMark: config.copyrightMark, threadModel, userModel, user, thread, api: config.globalapi });
