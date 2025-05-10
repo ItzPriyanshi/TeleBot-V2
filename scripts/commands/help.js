@@ -4,7 +4,7 @@ const path = require('path');
 module.exports = {
     config: {
         name: 'help',
-        aliases: ['h'],
+        aliases: ['menu'],
         category: 'utility',
         role: 0,
         cooldowns: 5,
