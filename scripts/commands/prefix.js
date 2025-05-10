@@ -1,28 +1,38 @@
+const fs = require('fs');
+const path = require('path');
+
+const configPath = path.join(__dirname, '../../config.json');
+
+function writeConfig(config) {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+}
+
 module.exports = {
     config: {
         name: 'prefix',
-        aliases: ['setprefix'], // Add more aliases if needed
+        aliases: ['setprefix'],
         category: 'admin',
-        role: 2, // Only bot admin can change prefix
+        role: 2,
         cooldowns: 5,
         version: '1.0.0',
-        author: 'Samir Thakuri',
+        author: 'Samir Thakuri || Priyanshi Kaur',
         description: 'Change the bot\'s prefix',
         usage: 'prefix <new-prefix>'
     },
 
     onStart: async function({ msg, bot, args, config }) {
-        // Check if new prefix is provided
         if (!args[0]) {
-            bot.sendMessage(msg.chat.id, 'Please provide a new prefix.', { replyToMessage: msg.message_id });
+            bot.sendMessage(msg.chat.id, '❌ Please provide a new prefix.', { replyToMessage: msg.message_id });
             return;
         }
 
-        // Update the prefix in the config.json file
-        config.prefix = args[0];
-        // You need to implement the function to save the updated config to config.json
+        const newPrefix = args[0];
+        config.prefix = newPrefix;
+        writeConfig(config);
 
-        // Send confirmation message
-        bot.sendMessage(msg.chat.id, `Bot's prefix has been updated to: ${args[0]}`, { replyToMessage: msg.message_id });
+        bot.sendMessage(msg.chat.id, `✅ Bot prefix updated to: \`${newPrefix}\``, {
+            replyToMessage: msg.message_id,
+            parse_mode: 'Markdown'
+        });
     }
 };
