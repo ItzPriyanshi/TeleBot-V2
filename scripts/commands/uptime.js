@@ -49,17 +49,17 @@ module.exports = {
             const infoMessage = `
 🤖 *Bot Uptime & Status* 🤖
 
-⏳ **Uptime:** ${uptimeString}
-📅 **Started:** ${format(new Date(Date.now() - uptimeSeconds * 1000), 'PPpp')}
+⏳ 𝐔𝐏𝐓𝐈𝐌𝐄: ${uptimeString}
+📅 𝐒𝐓𝐀𝐑𝐓𝐄𝐃: ${format(new Date(Date.now() - uptimeSeconds * 1000), 'PPpp')}
 
-🖥 **System Information:**
+🖥 𝐒𝐘𝐒𝐓𝐄𝐌 𝐈𝐍𝐅𝐎𝐑𝐌𝐀𝐓𝐈𝐎𝐍:
 ▸ OS: ${systemInfo.platform} (${systemInfo.arch})
 ▸ CPU: ${systemInfo.cpu} (${systemInfo.cores} cores)
 ▸ Memory: ${systemInfo.freeMemory} free / ${systemInfo.memory} total
 ▸ Node.js: ${systemInfo.nodeVersion}
 ▸ Bot Version: v${systemInfo.botVersion}
 
-👤 **Owner Information:**
+👤 𝐁𝐎𝐓 𝐎𝐖𝐍𝐄𝐑:
 ▸ Name: ${ownerInfo.name}
 ▸ Contact: ${ownerInfo.contact}
 ▸ GitHub: ${ownerInfo.github}
